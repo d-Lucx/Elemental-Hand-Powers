@@ -37,9 +37,11 @@ interface ParticleSlot {
 
 export interface ElementalProjectile {
   kind: 'fireball' | 'magma-bolt' | 'frost-shard' | 'plasma-core';
+  ownerSide: HandSide | 'both';
   mesh: THREE.Mesh;
   body: RAPIER.RigidBody | null;
   velocity: THREE.Vector3;
+  prevVelocity: THREE.Vector3;
   radius: number;
   damage: number;
   impulseStrength: number;
@@ -47,6 +49,7 @@ export interface ElementalProjectile {
   maxAge: number;
   color: number;
   bounces: number;
+  lastBounceAge: number;
 }
 
 interface RibbonTrail {
@@ -689,7 +692,8 @@ export class ElementalVFXSystem extends THREE.Group {
     origin: THREE.Vector3,
     direction: THREE.Vector3,
     speed: number,
-    radius = 0.075
+    radius = 0.075,
+    ownerSide: HandSide | 'both' = 'right'
   ): void {
     const dir = direction.clone().normalize();
     const vel = dir.clone().multiplyScalar(speed);
@@ -731,9 +735,11 @@ export class ElementalVFXSystem extends THREE.Group {
 
     this.projectiles.push({
       kind,
+      ownerSide: kind === 'plasma-core' ? 'both' : ownerSide,
       mesh,
       body,
       velocity: vel,
+      prevVelocity: vel.clone(),
       radius,
       damage:
         kind === 'plasma-core'
@@ -762,6 +768,7 @@ export class ElementalVFXSystem extends THREE.Group {
               ? 0xef4444
               : 0xff6b2b,
       bounces: 0,
+      lastBounceAge: -1,
     });
   }
 
@@ -1235,9 +1242,17 @@ export class ElementalVFXSystem extends THREE.Group {
       target: ElementalTarget,
       impulse: THREE.Vector3,
       damage: number,
-      impactPos: THREE.Vector3
+      impactPos: THREE.Vector3,
+      kind: ElementalProjectile['kind'],
+      ownerSide: HandSide | 'both',
+      impactSpeed: number
     ) => void,
-    onBounce?: (pos: THREE.Vector3) => void
+    onBounce?: (
+      pos: THREE.Vector3,
+      impactSpeed: number,
+      kind: ElementalProjectile['kind'],
+      ownerSide: HandSide | 'both'
+    ) => void
   ): void {
     this.elapsed += dt;
     this.fireballMat.uniforms.uTime.value = this.elapsed;
@@ -1282,12 +1297,33 @@ export class ElementalVFXSystem extends THREE.Group {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const proj = this.projectiles[i];
       proj.age += dt;
+      proj.prevVelocity.copy(proj.velocity);
 
       if (proj.body) {
         const t = proj.body.translation();
         const lv = proj.body.linvel();
         proj.mesh.position.set(t.x, t.y, t.z);
         proj.velocity.set(lv.x, lv.y, lv.z);
+
+        // Detect Rapier 3D collision bounce from sudden velocity impulse change
+        const deltaV = proj.prevVelocity.distanceTo(proj.velocity);
+        if (
+          proj.age > 0.04 &&
+          proj.age - proj.lastBounceAge > 0.09 &&
+          deltaV > 1.75
+        ) {
+          proj.bounces++;
+          proj.lastBounceAge = proj.age;
+          this.spawnBurst(
+            proj.mesh.position,
+            6,
+            proj.color,
+            0xffe4b5,
+            Math.min(2.8, 1.0 + deltaV * 0.28),
+            -2.4
+          );
+          onBounce?.(proj.mesh.position, deltaV, proj.kind, proj.ownerSide);
+        }
       } else {
         proj.mesh.position.addScaledVector(proj.velocity, dt);
       }
@@ -1308,10 +1344,11 @@ export class ElementalVFXSystem extends THREE.Group {
 
       // Floor bounce fallback if no Rapier body
       if (!proj.body && proj.mesh.position.y < 0.05) {
+        const impactSpeed = Math.max(1.2, Math.abs(proj.velocity.y) * 1.7);
         proj.mesh.position.y = 0.05;
         proj.velocity.y = Math.abs(proj.velocity.y) * 0.7;
         proj.bounces++;
-        onBounce?.(proj.mesh.position);
+        onBounce?.(proj.mesh.position, impactSpeed, proj.kind, proj.ownerSide);
       }
 
       // Check collision against elemental targets
@@ -1321,9 +1358,21 @@ export class ElementalVFXSystem extends THREE.Group {
         _tmpVec3.copy(target.group.position);
         _tmpVec3.y += 0.18;
         if (proj.mesh.position.distanceTo(_tmpVec3) < proj.radius + 0.24) {
+          const impactSpeed = Math.max(
+            proj.impulseStrength * 1.35,
+            proj.velocity.length()
+          );
           _tmpVec2.copy(proj.velocity).normalize().multiplyScalar(proj.impulseStrength);
           _tmpVec2.y += 0.45;
-          onHitTarget(target, _tmpVec2, proj.damage, proj.mesh.position.clone());
+          onHitTarget(
+            target,
+            _tmpVec2,
+            proj.damage,
+            proj.mesh.position.clone(),
+            proj.kind,
+            proj.ownerSide,
+            impactSpeed
+          );
           this.spawnBurst(
             proj.mesh.position,
             proj.kind === 'frost-shard' ? 8 : 22,

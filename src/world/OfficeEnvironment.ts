@@ -4,7 +4,7 @@ import * as xb from 'xrblocks';
 
 type RapierModule = typeof RAPIER;
 
-interface StaticBoxColliderSpec {
+export interface StaticBoxColliderSpec {
   pos: [number, number, number];
   halfExtents: [number, number, number];
 }
@@ -38,6 +38,10 @@ export class OfficeEnvironment extends THREE.Group {
     return this._enabled;
   }
 
+  getColliderBounds(): readonly StaticBoxColliderSpec[] {
+    return this._enabled ? this.colliderSpecs : [];
+  }
+
   setEnabled(enabled: boolean): void {
     if (this._enabled === enabled) return;
     this._enabled = enabled;
@@ -67,22 +71,31 @@ export class OfficeEnvironment extends THREE.Group {
     return m;
   }
 
-  private createWoodTexture(): THREE.CanvasTexture {
+  private createWoodTexture(
+    repeatX = 4,
+    repeatY = 3.2,
+    baseHex = '#5a4030'
+  ): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 512;
     const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#5a4030';
+    ctx.fillStyle = baseHex;
     ctx.fillRect(0, 0, 512, 512);
 
-    // Subtle oak plank grain
+    // Subtle oak plank grain with staggered joints
     for (let p = 0; p < 8; p++) {
       const y = p * 64;
-      const shade = 78 + (p % 3) * 9;
-      ctx.fillStyle = `rgb(${shade + 14}, ${shade - 4}, ${shade - 18})`;
+      const shade = 84 + (p % 3) * 9;
+      ctx.fillStyle = `rgb(${shade + 16}, ${shade - 4}, ${shade - 18})`;
       ctx.fillRect(0, y, 512, 62);
-      ctx.fillStyle = 'rgba(28, 18, 12, 0.35)';
+      ctx.fillStyle = 'rgba(24, 15, 10, 0.38)';
       ctx.fillRect(0, y + 62, 512, 2);
+
+      // Vertical plank end-seam staggered per row
+      const seamX = ((p * 173) % 440) + 36;
+      ctx.fillStyle = 'rgba(24, 15, 10, 0.32)';
+      ctx.fillRect(seamX, y, 2, 62);
 
       for (let g = 0; g < 18; g++) {
         ctx.strokeStyle = `rgba(38, 24, 15, ${0.08 + Math.random() * 0.1})`;
@@ -106,7 +119,154 @@ export class OfficeEnvironment extends THREE.Group {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = THREE.RepeatWrapping;
     tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(4, 4);
+    tex.repeat.set(repeatX, repeatY);
+    tex.anisotropy = 8;
+    this.textures.push(tex);
+    return tex;
+  }
+
+  private createCeilingTileTexture(
+    repeatX = 6,
+    repeatY = 4.5
+  ): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d')!;
+
+    // Architectural acoustic plaster tile base
+    ctx.fillStyle = '#cfd7e3';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // 2x2 suspended acoustic panels per tile with subtle recessed bevel
+    const half = 256;
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 2; c++) {
+        const x0 = c * half;
+        const y0 = r * half;
+
+        // Soft interior panel gradient
+        const panelGrad = ctx.createLinearGradient(
+          x0,
+          y0,
+          x0 + half,
+          y0 + half
+        );
+        panelGrad.addColorStop(0, '#d8e0eb');
+        panelGrad.addColorStop(1, '#c3ccd9');
+        ctx.fillStyle = panelGrad;
+        ctx.fillRect(x0 + 5, y0 + 5, half - 10, half - 10);
+
+        // Recessed shadow-gap grid lines
+        ctx.strokeStyle = 'rgba(51, 65, 85, 0.45)';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(x0 + 2, y0 + 2, half - 4, half - 4);
+
+        // Subtle inner highlight bevel
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x0 + 6, y0 + 6, half - 12, half - 12);
+      }
+    }
+
+    // Fine acoustic micro-texture stipple
+    for (let i = 0; i < 1400; i++) {
+      const px = Math.random() * 512;
+      const py = Math.random() * 512;
+      ctx.fillStyle =
+        i % 3 === 0
+          ? 'rgba(71, 85, 105, 0.09)'
+          : 'rgba(255, 255, 255, 0.08)';
+      ctx.fillRect(px, py, 2, 2);
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(repeatX, repeatY);
+    tex.anisotropy = 8;
+    this.textures.push(tex);
+    return tex;
+  }
+
+  private createWallPlasterTexture(
+    repeatX: number,
+    repeatY: number,
+    baseColor: string,
+    seamColor: string
+  ): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.fillStyle = baseColor;
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Subtle matte architectural plaster grain
+    for (let i = 0; i < 2200; i++) {
+      const x = Math.random() * 512;
+      const y = Math.random() * 512;
+      const w = 1 + Math.random() * 3;
+      const h = 1 + Math.random() * 2;
+      ctx.fillStyle =
+        i % 2 === 0
+          ? 'rgba(255, 255, 255, 0.025)'
+          : 'rgba(0, 0, 0, 0.04)';
+      ctx.fillRect(x, y, w, h);
+    }
+
+    // Subtle architectural panel reveal seams
+    ctx.strokeStyle = seamColor;
+    ctx.lineWidth = 2;
+    for (const x of [0, 256]) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 512);
+      ctx.stroke();
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(repeatX, repeatY);
+    tex.anisotropy = 8;
+    this.textures.push(tex);
+    return tex;
+  }
+
+  private createRugTexture(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Woven cross-hatch texture
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.08)';
+    for (let y = 0; y < 512; y += 4) {
+      ctx.fillRect(0, y, 512, 1);
+    }
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.14)';
+    for (let x = 0; x < 512; x += 6) {
+      ctx.fillRect(x, 0, 2, 512);
+    }
+
+    // Subtle double stitched perimeter border
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(18, 18, 476, 476);
+    ctx.strokeStyle = 'rgba(203, 213, 225, 0.16)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(30, 30, 452, 452);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
     this.textures.push(tex);
     return tex;
   }
@@ -144,39 +304,96 @@ export class OfficeEnvironment extends THREE.Group {
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
     this.textures.push(tex);
     return tex;
   }
 
   private buildOffice(): void {
-    const woodTex = this.createWoodTexture();
+    // Watertight room interior dimensions:
+    // X: [-4.1, +4.1] (width 8.2m)
+    // Z: [-3.55, +2.65] (depth 6.2m, center z = -0.45m)
+    // Y: [0.0, 3.20] (height 3.2m)
+    const roomW = 8.2;
+    const roomD = 6.2;
+    const roomH = 3.2;
+    const roomCenterZ = -0.45;
+    const backWallZ = roomCenterZ - roomD / 2; // -3.55
+    const rearWallZ = roomCenterZ + roomD / 2; // +2.65
+    const halfW = roomW / 2; // 4.1
+
+    const floorWoodTex = this.createWoodTexture(4.2, 3.2, '#5a4030');
+    const deskWoodTex = this.createWoodTexture(2.0, 1.0, '#6a4a35');
+    const ceilingTex = this.createCeilingTileTexture(6, 4.5);
+    const backWallTex = this.createWallPlasterTexture(
+      4.1,
+      1.6,
+      '#222938',
+      'rgba(10, 15, 25, 0.35)'
+    );
+    const sideWallTex = this.createWallPlasterTexture(
+      3.1,
+      1.6,
+      '#2c3444',
+      'rgba(15, 23, 42, 0.28)'
+    );
+    const rugTex = this.createRugTexture();
     const screenTex = this.createScreenTexture();
 
     const floorMat = this.trackMat(
       new THREE.MeshStandardMaterial({
-        map: woodTex,
-        roughness: 0.62,
+        map: floorWoodTex,
+        roughness: 0.58,
         metalness: 0.06,
+      })
+    );
+    const subfloorMat = this.trackMat(
+      new THREE.MeshStandardMaterial({
+        color: 0x151922,
+        roughness: 0.95,
+      })
+    );
+    const ceilingMat = this.trackMat(
+      new THREE.MeshStandardMaterial({
+        map: ceilingTex,
+        emissiveMap: ceilingTex,
+        emissive: 0x3b485c,
+        emissiveIntensity: 0.42,
+        roughness: 0.88,
+        metalness: 0.02,
+      })
+    );
+    const roofCapMat = this.trackMat(
+      new THREE.MeshStandardMaterial({
+        color: 0x1b2230,
+        roughness: 0.92,
       })
     );
     const wallMat = this.trackMat(
       new THREE.MeshStandardMaterial({
-        color: 0x262b36,
-        roughness: 0.9,
+        map: sideWallTex,
+        roughness: 0.88,
         metalness: 0.04,
       })
     );
     const accentWallMat = this.trackMat(
       new THREE.MeshStandardMaterial({
-        color: 0x1e2430,
-        roughness: 0.85,
-        metalness: 0.08,
+        map: backWallTex,
+        roughness: 0.84,
+        metalness: 0.06,
+      })
+    );
+    const trimMat = this.trackMat(
+      new THREE.MeshStandardMaterial({
+        color: 0x181e29,
+        roughness: 0.55,
+        metalness: 0.12,
       })
     );
     const deskWoodMat = this.trackMat(
       new THREE.MeshStandardMaterial({
-        color: 0x6f4e37,
-        roughness: 0.52,
+        map: deskWoodTex,
+        roughness: 0.48,
         metalness: 0.08,
       })
     );
@@ -213,8 +430,8 @@ export class OfficeEnvironment extends THREE.Group {
     );
     const rugMat = this.trackMat(
       new THREE.MeshStandardMaterial({
-        color: 0x334155,
-        roughness: 0.95,
+        map: rugTex,
+        roughness: 0.94,
         metalness: 0.0,
       })
     );
@@ -226,6 +443,15 @@ export class OfficeEnvironment extends THREE.Group {
         roughness: 0.2,
       })
     );
+    const ceilingLedMat = this.trackMat(
+      new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xfff7e6,
+        emissiveIntensity: 1.5,
+        roughness: 0.18,
+        metalness: 0.05,
+      })
+    );
     const plantLeafMat = this.trackMat(
       new THREE.MeshStandardMaterial({
         color: 0x2d6a4f,
@@ -234,59 +460,171 @@ export class OfficeEnvironment extends THREE.Group {
       })
     );
 
-    // 1. Hardwood Floor + Center Area Rug (offset +0.008m to prevent Z-fighting)
-    const floor = new THREE.Mesh(
-      this.trackGeo(new THREE.BoxGeometry(8.4, 0.08, 7.6)),
+    // 1. Hardwood Floor (clean UV-mapped top plane + solid subfloor + woven area rug)
+    const floorSurface = new THREE.Mesh(
+      this.trackGeo(new THREE.PlaneGeometry(roomW, roomD)),
       floorMat
     );
-    floor.position.set(0, -0.04, -1.2);
-    floor.receiveShadow = true;
-    this.add(floor);
+    floorSurface.rotation.x = -Math.PI / 2;
+    floorSurface.position.set(0, 0, roomCenterZ);
+    floorSurface.receiveShadow = true;
+    this.add(floorSurface);
+
+    const subfloor = new THREE.Mesh(
+      this.trackGeo(new THREE.BoxGeometry(roomW + 0.24, 0.08, roomD + 0.24)),
+      subfloorMat
+    );
+    subfloor.position.set(0, -0.045, roomCenterZ);
+    this.add(subfloor);
 
     const rug = new THREE.Mesh(
-      this.trackGeo(new THREE.BoxGeometry(3.4, 0.014, 2.5)),
+      this.trackGeo(new THREE.BoxGeometry(3.4, 0.016, 2.5)),
       rugMat
     );
-    rug.position.set(0, 0.007, -1.1);
+    rug.position.set(0, 0.008, -1.1);
     rug.receiveShadow = true;
     this.add(rug);
 
-    // 2. Architectural Perimeter Walls (Back, Left, Right + Ceiling trim beams)
+    // 2. Complete 4-Wall Enclosure (Back, Rear, Left, Right) with world-scaled UVs
+    const wallThick = 0.16;
+
     const backWall = new THREE.Mesh(
-      this.trackGeo(new THREE.BoxGeometry(8.4, 3.2, 0.16)),
+      this.trackGeo(new THREE.PlaneGeometry(roomW, roomH)),
       accentWallMat
     );
-    backWall.position.set(0, 1.6, -3.55);
+    backWall.position.set(0, roomH / 2, backWallZ);
     backWall.receiveShadow = true;
     this.add(backWall);
-    this.colliderSpecs.push({pos: [0, 1.6, -3.55], halfExtents: [4.2, 1.6, 0.08]});
+    this.colliderSpecs.push({
+      pos: [0, roomH / 2, backWallZ - wallThick / 2],
+      halfExtents: [halfW + 0.12, roomH / 2, wallThick / 2],
+    });
+
+    const rearWall = new THREE.Mesh(
+      this.trackGeo(new THREE.PlaneGeometry(roomW, roomH)),
+      accentWallMat
+    );
+    rearWall.rotation.y = Math.PI;
+    rearWall.position.set(0, roomH / 2, rearWallZ);
+    rearWall.receiveShadow = true;
+    this.add(rearWall);
+    this.colliderSpecs.push({
+      pos: [0, roomH / 2, rearWallZ + wallThick / 2],
+      halfExtents: [halfW + 0.12, roomH / 2, wallThick / 2],
+    });
+
+    const leftWall = new THREE.Mesh(
+      this.trackGeo(new THREE.PlaneGeometry(roomD, roomH)),
+      wallMat
+    );
+    leftWall.rotation.y = Math.PI / 2;
+    leftWall.position.set(-halfW, roomH / 2, roomCenterZ);
+    leftWall.receiveShadow = true;
+    this.add(leftWall);
+    this.colliderSpecs.push({
+      pos: [-halfW - wallThick / 2, roomH / 2, roomCenterZ],
+      halfExtents: [wallThick / 2, roomH / 2, roomD / 2 + 0.12],
+    });
+
+    const rightWall = new THREE.Mesh(
+      this.trackGeo(new THREE.PlaneGeometry(roomD, roomH)),
+      wallMat
+    );
+    rightWall.rotation.y = -Math.PI / 2;
+    rightWall.position.set(halfW, roomH / 2, roomCenterZ);
+    rightWall.receiveShadow = true;
+    this.add(rightWall);
+    this.colliderSpecs.push({
+      pos: [halfW + wallThick / 2, roomH / 2, roomCenterZ],
+      halfExtents: [wallThick / 2, roomH / 2, roomD / 2 + 0.12],
+    });
 
     // Subtle slatted architectural wood panels on back wall
-    const slatGeo = this.trackGeo(new THREE.BoxGeometry(0.06, 2.8, 0.03));
+    const slatGeo = this.trackGeo(new THREE.BoxGeometry(0.06, 2.86, 0.03));
     for (let i = -8; i <= 8; i++) {
       const slat = new THREE.Mesh(slatGeo, deskWoodMat);
-      slat.position.set(i * 0.18, 1.55, -3.45);
+      slat.position.set(i * 0.18, 1.56, backWallZ + 0.02);
       slat.receiveShadow = true;
       this.add(slat);
     }
 
-    const leftWall = new THREE.Mesh(
-      this.trackGeo(new THREE.BoxGeometry(0.16, 3.2, 7.6)),
-      wallMat
+    // 2b. Watertight Roof / Ceiling with Acoustic Tile Texture, Timber Beams & Recessed LED Troffers
+    // castShadow = false ensures the studio directional key light illuminates the interior cleanly
+    const ceilingSurface = new THREE.Mesh(
+      this.trackGeo(new THREE.PlaneGeometry(roomW, roomD)),
+      ceilingMat
     );
-    leftWall.position.set(-4.1, 1.6, -1.2);
-    leftWall.receiveShadow = true;
-    this.add(leftWall);
-    this.colliderSpecs.push({pos: [-4.1, 1.6, -1.2], halfExtents: [0.08, 1.6, 3.8]});
+    ceilingSurface.rotation.x = Math.PI / 2;
+    ceilingSurface.position.set(0, roomH, roomCenterZ);
+    ceilingSurface.receiveShadow = true;
+    ceilingSurface.castShadow = false;
+    this.add(ceilingSurface);
 
-    const rightWall = new THREE.Mesh(
-      this.trackGeo(new THREE.BoxGeometry(0.16, 3.2, 7.6)),
-      wallMat
+    // Exterior roof cap slab sealing the top perimeter cleanly
+    const roofCap = new THREE.Mesh(
+      this.trackGeo(new THREE.BoxGeometry(roomW + 0.24, 0.12, roomD + 0.24)),
+      roofCapMat
     );
-    rightWall.position.set(4.1, 1.6, -1.2);
-    rightWall.receiveShadow = true;
-    this.add(rightWall);
-    this.colliderSpecs.push({pos: [4.1, 1.6, -1.2], halfExtents: [0.08, 1.6, 3.8]});
+    roofCap.position.set(0, roomH + 0.065, roomCenterZ);
+    roofCap.castShadow = false;
+    this.add(roofCap);
+    this.colliderSpecs.push({
+      pos: [0, roomH + 0.065, roomCenterZ],
+      halfExtents: [halfW + 0.12, 0.065, roomD / 2 + 0.12],
+    });
+
+    // Exposed walnut architectural ceiling beams
+    const beamGeo = this.trackGeo(new THREE.BoxGeometry(roomW - 0.02, 0.11, 0.13));
+    const bracketGeo = this.trackGeo(new THREE.BoxGeometry(0.08, 0.13, 0.15));
+    for (const bz of [-2.45, -1.1, 0.25, 1.6]) {
+      const beam = new THREE.Mesh(beamGeo, deskWoodMat);
+      beam.position.set(0, roomH - 0.055, bz);
+      beam.receiveShadow = true;
+      beam.castShadow = false;
+      this.add(beam);
+
+      for (const sx of [-halfW + 0.04, halfW - 0.04]) {
+        const bracket = new THREE.Mesh(bracketGeo, darkMetalMat);
+        bracket.position.set(sx, roomH - 0.055, bz);
+        this.add(bracket);
+      }
+    }
+
+    // Recessed architectural LED light panels centered in the ceiling bays
+    const ledFrameGeo = this.trackGeo(new THREE.BoxGeometry(1.42, 0.014, 0.44));
+    const ledDiffuserGeo = this.trackGeo(new THREE.PlaneGeometry(1.34, 0.36));
+    for (const lz of [-1.78, -0.42, 0.92]) {
+      for (const lx of [-1.85, 1.85]) {
+        const frame = new THREE.Mesh(ledFrameGeo, brushedAluminumMat);
+        frame.position.set(lx, roomH - 0.008, lz);
+        this.add(frame);
+
+        const diffuser = new THREE.Mesh(ledDiffuserGeo, ceilingLedMat);
+        diffuser.rotation.x = Math.PI / 2;
+        diffuser.position.set(lx, roomH - 0.016, lz);
+        this.add(diffuser);
+      }
+    }
+
+    // Perimeter crown molding (ceiling seam) & baseboards (floor seam) for crisp corner seals
+    const longTrimGeo = this.trackGeo(new THREE.BoxGeometry(roomW, 0.08, 0.04));
+    const sideTrimGeo = this.trackGeo(new THREE.BoxGeometry(0.04, 0.08, roomD));
+    for (const yPos of [0.04, roomH - 0.04]) {
+      const backTrim = new THREE.Mesh(longTrimGeo, trimMat);
+      backTrim.position.set(0, yPos, backWallZ + 0.02);
+      const rearTrim = new THREE.Mesh(longTrimGeo, trimMat);
+      rearTrim.position.set(0, yPos, rearWallZ - 0.02);
+      const leftTrim = new THREE.Mesh(sideTrimGeo, trimMat);
+      leftTrim.position.set(-halfW + 0.02, yPos, roomCenterZ);
+      const rightTrim = new THREE.Mesh(sideTrimGeo, trimMat);
+      rightTrim.position.set(halfW - 0.02, yPos, roomCenterZ);
+      this.add(backTrim, rearTrim, leftTrim, rightTrim);
+    }
+
+    // Warm indoor bounce light so the ceiling tiles, beams, and upper walls are cleanly illuminated
+    const indoorBounceLight = new THREE.PointLight(0xfff4e0, 1.4, 11, 1.35);
+    indoorBounceLight.position.set(0, 2.55, -0.75);
+    this.add(indoorBounceLight);
 
     // 3. Executive Office Desk (Composite multi-part group at z = -2.45m, tabletop y = 0.76m)
     const deskGroup = new THREE.Group();
@@ -422,7 +760,11 @@ export class OfficeEnvironment extends THREE.Group {
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2;
       const leaf = new THREE.Mesh(leafGeo, plantLeafMat);
-      leaf.position.set(Math.cos(a) * 0.14, 0.62 + (i % 2) * 0.12, Math.sin(a) * 0.14);
+      leaf.position.set(
+        Math.cos(a) * 0.14,
+        0.62 + (i % 2) * 0.12,
+        Math.sin(a) * 0.14
+      );
       leaf.rotation.z = -Math.cos(a) * 0.5;
       leaf.rotation.x = Math.sin(a) * 0.5;
       leaf.castShadow = true;

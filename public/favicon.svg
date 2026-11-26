@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Elemental Hand Powers">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="60%">
+      <stop offset="0%" stop-color="#1a2442" />
+      <stop offset="65%" stop-color="#0d1326" />
+      <stop offset="100%" stop-color="#070a14" />
+    </radialGradient>
+    <linearGradient id="ring" x1="12%" y1="10%" x2="88%" y2="90%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#ff6b2b" />
+    </linearGradient>
+    <linearGradient id="hand" x1="25%" y1="15%" x2="75%" y2="90%">
+      <stop offset="0%" stop-color="#f8fafc" />
+      <stop offset="65%" stop-color="#cbd5e1" />
+      <stop offset="100%" stop-color="#94a3b8" />
+    </linearGradient>
+    <radialGradient id="orb" cx="42%" cy="38%" r="58%">
+      <stop offset="0%" stop-color="#fffbeb" />
+      <stop offset="35%" stop-color="#fbbf24" />
+      <stop offset="72%" stop-color="#ff6b2b" />
+      <stop offset="100%" stop-color="#c026d3" stop-opacity="0.9" />
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="52%" r="42%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.45" />
+      <stop offset="55%" stop-color="#a855f7" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#070a14" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Rounded dark obsidian tile -->
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#bg)" stroke="url(#ring)" stroke-width="2" />
+
+  <!-- Ambient arcane glow -->
+  <circle cx="32" cy="34" r="24" fill="url(#glow)" />
+
+  <!-- Outer elemental rune arc -->
+  <circle cx="32" cy="32" r="23.5" fill="none" stroke="url(#ring)" stroke-width="1.5" stroke-dasharray="14 6 8 6" opacity="0.7" />
+
+  <!-- Four cardinal elemental pips (Frost, Fire, Void, Flora) -->
+  <circle cx="32" cy="8.5" r="2.1" fill="#38bdf8" />
+  <circle cx="55.5" cy="32" r="2.1" fill="#ff6b2b" />
+  <circle cx="32" cy="55.5" r="2.1" fill="#34d399" />
+  <circle cx="8.5" cy="32" r="2.1" fill="#a855f7" />
+
+  <!-- Stylized open arcane hand silhouette -->
+  <path
+    d="M21.8 49.5
+       C18.5 46.2 16.4 41.3 15.8 36.2
+       L14.4 27.6
+       C14.1 25.7 15.6 24.1 17.4 24.4
+       C18.8 24.6 19.9 25.7 20.2 27.2
+       L21.5 33.4
+       L21.9 18.8
+       C21.9 17.0 23.4 15.6 25.1 15.7
+       C26.7 15.8 27.9 17.1 27.9 18.8
+       L28.1 30.8
+       L29.7 14.8
+       C29.9 13.0 31.4 11.7 33.1 11.9
+       C34.8 12.0 36.0 13.4 35.9 15.1
+       L35.4 30.8
+       L38.3 17.8
+       C38.7 16.1 40.3 15.0 42.0 15.4
+       C43.6 15.8 44.6 17.4 44.2 19.1
+       L41.4 32.8
+       L45.1 25.6
+       C45.9 24.1 47.7 23.6 49.1 24.4
+       C50.4 25.2 50.9 27.0 50.1 28.4
+       L44.2 41.2
+       C42.3 45.4 39.2 48.5 35.3 50.2
+       C30.8 52.0 25.3 51.8 21.8 49.5 Z"
+    fill="url(#hand)"
+    opacity="0.94"
+  />
+
+  <!-- Glowing elemental energy core hovering in the palm -->
+  <circle cx="32.2" cy="38.2" r="8.8" fill="#0b1020" opacity="0.55" />
+  <circle cx="32.2" cy="38.2" r="6.8" fill="url(#orb)" />
+  <circle cx="30.4" cy="36.3" r="2.1" fill="#ffffff" opacity="0.85" />
+</svg>
